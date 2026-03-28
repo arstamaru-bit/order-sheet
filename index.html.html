@@ -1,0 +1,651 @@
+﻿
+
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>発注書作成</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f3f4f6;
+      font-family: Arial, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      color: #111;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 24px auto;
+      padding: 16px;
+    }
+
+    .panel {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+
+    h1, h2 {
+      margin-top: 0;
+    }
+
+    .grid-2, .grid-3, .grid-4, .grid-5 {
+      display: grid;
+      gap: 12px;
+    }
+
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .grid-5 { grid-template-columns: 1fr 1fr 1fr 1fr 1fr; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    .line-items {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .line-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fafafa;
+      padding: 12px;
+    }
+
+    .line-item-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-secondary { background: #e5e7eb; color: #111; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-print { background: #16a34a; color: #fff; }
+
+    #printArea {
+      display: none;
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+
+    .sheet-title {
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    .sheet-subtitle {
+      text-align: center;
+      font-size: 12px;
+      margin-bottom: 20px;
+      color: #555;
+    }
+
+    .sheet-flex {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .sheet-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .sheet-side {
+      width: 220px;
+      flex-shrink: 0;
+    }
+
+    .photo-box {
+      border: 1px solid #111;
+      height: 260px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fafafa;
+      overflow: hidden;
+    }
+
+    .photo-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+
+    .photo-placeholder {
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      padding: 12px;
+    }
+
+    .sheet-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+    }
+
+    .sheet-table th,
+    .sheet-table td {
+      border: 1px solid #111;
+      padding: 6px 8px;
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    .yellow {
+      background: #ffe45c;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .right { text-align: right; }
+    .center { text-align: center; }
+
+    .section-gap {
+      height: 12px;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none !important; }
+      #printArea {
+        display: block !important;
+        box-shadow: none;
+        border-radius: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="formArea" class="panel no-print">
+      <h1>発注書 作成フォーム</h1>
+
+      <div class="grid-4">
+        <div>
+          <label for="companyName">自社名</label>
+          <input id="companyName" value="株式会社アンティローザ" readonly>
+        </div>
+        <div>
+          <label for="supplierName">取引先名</label>
+          <input id="supplierName" placeholder="例：株式会社〇〇">
+        </div>
+        <div>
+          <label for="orderDate">発注日</label>
+          <input id="orderDate" type="date">
+        </div>
+        <div>
+          <label for="staffName">担当者</label>
+          <input id="staffName" placeholder="例：田丸 さやか">
+        </div>
+      </div>
+
+      <div class="grid-5" style="margin-top: 12px;">
+        <div>
+          <label for="deliveryMonth">納期（月）</label>
+          <select id="deliveryMonth">
+            <option value="">選択してください</option>
+            <option value="1月">1月</option>
+            <option value="2月">2月</option>
+            <option value="3月">3月</option>
+            <option value="4月">4月</option>
+            <option value="5月">5月</option>
+            <option value="6月">6月</option>
+            <option value="7月">7月</option>
+            <option value="8月">8月</option>
+            <option value="9月">9月</option>
+            <option value="10月">10月</option>
+            <option value="11月">11月</option>
+            <option value="12月">12月</option>
+          </select>
+        </div>
+        <div>
+          <label for="deliveryTerm">納期（時期）</label>
+          <select id="deliveryTerm">
+            <option value="">選択してください</option>
+            <option value="上旬">上旬</option>
+            <option value="中旬">中旬</option>
+            <option value="下旬">下旬</option>
+          </select>
+        </div>
+        <div>
+          <label for="shipTo">納品先</label>
+          <select id="shipTo">
+            <option value="">選択してください</option>
+            <option value="岐阜商品センター">岐阜商品センター</option>
+            <option value="アクラ倉庫">アクラ倉庫</option>
+            <option value="本社">本社</option>
+          </select>
+        </div>
+        <div>
+          <label for="supplierCode">仕入れ先品番</label>
+          <input id="supplierCode" placeholder="例：ABC-1234">
+        </div>
+        <div>
+          <label for="productImage">商品画像</label>
+          <input id="productImage" type="file" accept="image/*">
+        </div>
+      </div>
+
+      <div class="grid-4" style="margin-top: 12px;">
+        <div>
+          <label for="itemCode">自社品番</label>
+          <input id="itemCode" placeholder="例：DIDEE251001">
+        </div>
+        <div>
+          <label for="itemName">品名</label>
+          <input id="itemName" placeholder="例：シアータンクトップ">
+        </div>
+        <div>
+          <label for="itemRetail">上代</label>
+          <input id="itemRetail" type="number" min="0" placeholder="例：3900">
+        </div>
+        <div>
+          <label for="itemRate">原価率</label>
+          <input id="itemRate" readonly placeholder="明細から自動計算">
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 12px;">
+        <div>
+          <label for="avgPrice">平均単価</label>
+          <input id="avgPrice" readonly placeholder="明細から自動計算">
+        </div>
+        <div>
+          <label for="remarks">備考</label>
+          <textarea id="remarks" placeholder="備考を入力"></textarea>
+        </div>
+      </div>
+
+      <div class="section-gap"></div>
+
+      <h2>明細</h2>
+      <div id="lineItems" class="line-items"></div>
+
+      <div class="btn-row">
+        <button class="btn-secondary" type="button" onclick="addLineItem()">＋ 明細を追加</button>
+        <button class="btn-primary" type="button" onclick="generateSheet()">発注書を作成</button>
+      </div>
+    </div>
+
+    <div id="printArea">
+      <div class="sheet-title">ORDER SHEET</div>
+      <div class="sheet-subtitle">発注内容確認書</div>
+
+      <div class="sheet-flex">
+        <div class="sheet-main">
+          <table class="sheet-table">
+            <colgroup>
+              <col style="width: 14%">
+              <col style="width: 36%">
+              <col style="width: 14%">
+              <col style="width: 36%">
+            </colgroup>
+            <tr>
+              <th class="yellow">自社名</th>
+              <td id="outCompanyName"></td>
+              <th class="yellow">取引先名</th>
+              <td id="outSupplierName"></td>
+            </tr>
+            <tr>
+              <th class="yellow">発注日</th>
+              <td id="outOrderDate"></td>
+              <th class="yellow">納期</th>
+              <td id="outDelivery"></td>
+            </tr>
+            <tr>
+              <th class="yellow">担当者</th>
+              <td id="outStaffName"></td>
+              <th class="yellow">納品先</th>
+              <td id="outShipTo"></td>
+            </tr>
+            <tr>
+              <th class="yellow">仕入れ先品番</th>
+              <td id="outSupplierCode"></td>
+              <th class="yellow">自社品番</th>
+              <td id="outItemCode"></td>
+            </tr>
+            <tr>
+              <th class="yellow">品名</th>
+              <td id="outItemName"></td>
+              <th class="yellow">原価率</th>
+              <td id="outRate"></td>
+            </tr>
+            <tr>
+              <th class="yellow">平均単価</th>
+              <td id="outAvgPrice" class="right"></td>
+              <th class="yellow">上代</th>
+              <td id="outItemRetail" class="right"></td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="sheet-side">
+          <div class="photo-box">
+            <img id="outImage" alt="商品画像">
+            <div id="photoPlaceholder" class="photo-placeholder">商品画像なし</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-gap"></div>
+
+      <table class="sheet-table">
+        <colgroup>
+          <col style="width: 28%">
+          <col style="width: 18%">
+          <col style="width: 18%">
+          <col style="width: 18%">
+          <col style="width: 18%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="yellow">カラー</th>
+            <th class="yellow">サイズ</th>
+            <th class="yellow">数量</th>
+            <th class="yellow">単価</th>
+            <th class="yellow">金額</th>
+          </tr>
+        </thead>
+        <tbody id="outLineItems"></tbody>
+        <tfoot>
+          <tr>
+            <th colspan="2" class="right">合計</th>
+            <th id="outTotalQty" class="right"></th>
+            <th></th>
+            <th id="outGrandTotal" class="right"></th>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div class="section-gap"></div>
+
+      <table class="sheet-table">
+        <tr>
+          <th class="yellow" style="width: 14%;">備考</th>
+          <td id="outRemarks"></td>
+        </tr>
+      </table>
+
+      <div class="btn-row no-print" style="margin-top: 20px;">
+        <button class="btn-secondary" onclick="backToEdit()">入力に戻る</button>
+        <button class="btn-print" onclick="window.print()">PDF保存 / 印刷</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let uploadedImageData = "";
+    let lineItemCount = 0;
+
+    function formatNumber(value) {
+      return Number(value || 0).toLocaleString("ja-JP");
+    }
+
+    function calculateSummaryFromLines() {
+      const retail = Number(document.getElementById("itemRetail").value || 0);
+      const rows = document.querySelectorAll(".line-item");
+
+      let totalQty = 0;
+      let totalAmount = 0;
+
+      rows.forEach((row) => {
+        const qty = Number(row.querySelector(".line-qty").value || 0);
+        const price = Number(row.querySelector(".line-price").value || 0);
+        totalQty += qty;
+        totalAmount += qty * price;
+      });
+
+      const avgPrice = totalQty > 0 ? totalAmount / totalQty : 0;
+      const rate = avgPrice > 0 && retail > 0 ? (avgPrice / retail) * 100 : 0;
+
+      document.getElementById("avgPrice").value = totalQty > 0 ? avgPrice.toFixed(1) : "";
+      document.getElementById("itemRate").value = (avgPrice > 0 && retail > 0) ? rate.toFixed(1) + "%" : "";
+    }
+
+    function addLineItem(defaults = {}) {
+      lineItemCount += 1;
+
+      const row = document.createElement("div");
+      row.className = "line-item";
+      row.dataset.lineId = String(lineItemCount);
+
+      row.innerHTML = `
+        <div class="line-item-head">
+          <strong>明細 ${lineItemCount}</strong>
+          <button class="btn-danger" type="button" onclick="removeLineItem(${lineItemCount})">削除</button>
+        </div>
+        <div class="grid-4">
+          <div>
+            <label>カラー</label>
+            <input class="line-color" value="${defaults.color || ""}" placeholder="例：IVORY">
+          </div>
+          <div>
+            <label>サイズ</label>
+            <input class="line-size" value="${defaults.size || ""}" placeholder="例：FREE">
+          </div>
+          <div>
+            <label>数量</label>
+            <input class="line-qty" type="number" min="0" value="${defaults.qty || ""}" placeholder="例：40">
+          </div>
+          <div>
+            <label>単価</label>
+            <input class="line-price" type="number" min="0" value="${defaults.price || ""}" placeholder="例：1200">
+          </div>
+        </div>
+      `;
+
+      document.getElementById("lineItems").appendChild(row);
+
+      row.querySelector(".line-qty").addEventListener("input", calculateSummaryFromLines);
+      row.querySelector(".line-price").addEventListener("input", calculateSummaryFromLines);
+    }
+
+    function removeLineItem(id) {
+      const el = document.querySelector(`[data-line-id="${id}"]`);
+      if (el) el.remove();
+      calculateSummaryFromLines();
+    }
+
+    function collectLineItems() {
+      const rows = document.querySelectorAll(".line-item");
+      const items = [];
+
+      rows.forEach((row) => {
+        const item = {
+          color: row.querySelector(".line-color").value.trim(),
+          size: row.querySelector(".line-size").value.trim(),
+          qty: Number(row.querySelector(".line-qty").value || 0),
+          price: Number(row.querySelector(".line-price").value || 0)
+        };
+
+        const hasValue = item.color || item.size || item.qty || item.price;
+        if (hasValue) items.push(item);
+      });
+
+      return items;
+    }
+
+    function generateSheet() {
+      const companyName = document.getElementById("companyName").value.trim();
+      const supplierName = document.getElementById("supplierName").value.trim();
+      const orderDate = document.getElementById("orderDate").value;
+      const deliveryMonth = document.getElementById("deliveryMonth").value;
+      const deliveryTerm = document.getElementById("deliveryTerm").value;
+      const staffName = document.getElementById("staffName").value.trim();
+      const shipTo = document.getElementById("shipTo").value;
+      const supplierCode = document.getElementById("supplierCode").value.trim();
+      const itemCode = document.getElementById("itemCode").value.trim();
+      const itemName = document.getElementById("itemName").value.trim();
+      const itemRetail = Number(document.getElementById("itemRetail").value || 0);
+      const remarks = document.getElementById("remarks").value.trim();
+      const lineItems = collectLineItems();
+
+      if (!itemName && !itemCode) {
+        alert("商品情報を入力してください。");
+        return;
+      }
+
+      if (lineItems.length === 0) {
+        alert("明細を1行以上入力してください。");
+        return;
+      }
+
+      const delivery = [deliveryMonth, deliveryTerm].filter(Boolean).join(" ");
+
+      let totalQty = 0;
+      let grandTotal = 0;
+      lineItems.forEach((item) => {
+        totalQty += item.qty;
+        grandTotal += item.qty * item.price;
+      });
+
+      const avgPrice = totalQty > 0 ? grandTotal / totalQty : 0;
+      const rate = avgPrice > 0 && itemRetail > 0 ? ((avgPrice / itemRetail) * 100).toFixed(1) + "%" : "";
+
+      document.getElementById("outCompanyName").textContent = companyName;
+      document.getElementById("outSupplierName").textContent = supplierName;
+      document.getElementById("outOrderDate").textContent = orderDate;
+      document.getElementById("outDelivery").textContent = delivery;
+      document.getElementById("outStaffName").textContent = staffName;
+      document.getElementById("outShipTo").textContent = shipTo;
+      document.getElementById("outSupplierCode").textContent = supplierCode;
+      document.getElementById("outItemCode").textContent = itemCode;
+      document.getElementById("outItemName").textContent = itemName;
+      document.getElementById("outItemRetail").textContent = formatNumber(itemRetail);
+      document.getElementById("outRate").textContent = rate;
+      document.getElementById("outAvgPrice").textContent = totalQty > 0 ? avgPrice.toFixed(1) : "";
+      document.getElementById("outRemarks").textContent = remarks;
+
+      const tbody = document.getElementById("outLineItems");
+      tbody.innerHTML = "";
+
+      lineItems.forEach((item) => {
+        const amount = item.qty * item.price;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="center">${item.color || ""}</td>
+          <td class="center">${item.size || ""}</td>
+          <td class="right">${formatNumber(item.qty)}</td>
+          <td class="right">${formatNumber(item.price)}</td>
+          <td class="right">${formatNumber(amount)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById("outTotalQty").textContent = formatNumber(totalQty);
+      document.getElementById("outGrandTotal").textContent = formatNumber(grandTotal);
+
+      const outImage = document.getElementById("outImage");
+      const photoPlaceholder = document.getElementById("photoPlaceholder");
+
+      if (uploadedImageData) {
+        outImage.src = uploadedImageData;
+        outImage.style.display = "block";
+        photoPlaceholder.style.display = "none";
+      } else {
+        outImage.style.display = "none";
+        photoPlaceholder.style.display = "block";
+      }
+
+      document.getElementById("formArea").style.display = "none";
+      document.getElementById("printArea").style.display = "block";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function backToEdit() {
+      document.getElementById("formArea").style.display = "block";
+      document.getElementById("printArea").style.display = "none";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    document.getElementById("itemRetail").addEventListener("input", calculateSummaryFromLines);
+
+    document.getElementById("productImage").addEventListener("change", function (event) {
+      const file = event.target.files[0];
+      if (!file) {
+        uploadedImageData = "";
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        uploadedImageData = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    document.getElementById("orderDate").value = `${yyyy}-${mm}-${dd}`;
+
+    addLineItem();
+    addLineItem();
+  </script>
+</body>
+</html>
