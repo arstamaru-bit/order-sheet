@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
@@ -197,7 +197,6 @@
 
     .right { text-align: right; }
     .center { text-align: center; }
-
     .section-gap { height: 12px; }
 
     .helper-text {
@@ -244,6 +243,24 @@
       background: #fff;
       padding: 14px;
       box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    }
+
+    .completed-order-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .completed-order-check input[type="checkbox"] {
+      width: 22px;
+      min-height: 22px;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .completed-order-body {
+      flex: 1;
+      min-width: 0;
     }
 
     .completed-order-title {
@@ -326,25 +343,16 @@
         width: 220px !important;
         flex-shrink: 0;
       }
-      .photo-box {
-        height: 260px !important;
-      }
-      .table-scroll {
-        overflow: visible;
-      }
+      .photo-box { height: 260px !important; }
+      .table-scroll { overflow: visible; }
       .sheet-table {
         min-width: 0;
         width: 100%;
         font-size: 11px;
       }
       .sheet-table th,
-      .sheet-table td {
-        padding: 5px 6px;
-      }
-      @page {
-        size: A4 landscape;
-        margin: 8mm;
-      }
+      .sheet-table td { padding: 5px 6px; }
+      @page { size: A4 landscape; margin: 8mm; }
     }
   </style>
 </head>
@@ -494,7 +502,12 @@
           <h1 style="margin-bottom: 4px;">作成済み発注書一覧</h1>
           <p class="helper-text" style="margin: 0;">作成から30日間保存されます</p>
         </div>
-        <button class="btn-secondary" type="button" onclick="hideCompletedOrderList()">入力画面に戻る</button>
+        <div class="btn-row" style="margin-top:0;">
+          <button class="btn-secondary" type="button" onclick="downloadSelectedCompletedOrdersCSV()">選択分をまとめてCSV出力</button>
+          <button class="btn-secondary" type="button" onclick="selectAllCompletedOrders(true)">すべて選択</button>
+          <button class="btn-secondary" type="button" onclick="selectAllCompletedOrders(false)">選択解除</button>
+          <button class="btn-secondary" type="button" onclick="hideCompletedOrderList()">入力画面に戻る</button>
+        </div>
       </div>
       <div id="completedOrderCards" class="completed-order-list"></div>
     </div>
@@ -609,6 +622,7 @@
       <div class="btn-row no-print" style="margin-top: 20px;">
         <button class="btn-secondary" onclick="backToEdit()">入力に戻る</button>
         <button class="btn-print" onclick="window.print()">PDF保存 / 印刷</button>
+        <button class="btn-secondary" onclick="downloadCSV()">CSVダウンロード</button>
       </div>
     </div>
   </div>
@@ -643,6 +657,11 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    function csvEscape(value) {
+      const text = String(value ?? "");
+      return `"${text.replace(/"/g, '""')}"`;
     }
 
     function calculateSummaryFromLines() {
@@ -681,9 +700,7 @@
 
       document.querySelectorAll(".line-price").forEach((input) => {
         const isEdited = input.dataset.edited === "true";
-        if (!isEdited) {
-          input.value = basePrice;
-        }
+        if (!isEdited) input.value = basePrice;
       });
 
       calculateSummaryFromLines();
@@ -784,12 +801,10 @@
 
       const supplierName = document.getElementById("supplierName").value.trim();
       const itemName = document.getElementById("itemName").value.trim();
-
       const today = new Date();
       const yyyy = today.getFullYear();
       const mm = String(today.getMonth() + 1).padStart(2, "0");
       const dd = String(today.getDate()).padStart(2, "0");
-
       return `${yyyy}-${mm}-${dd}_${supplierName || "取引先未入力"}_${itemName || "商品名未入力"}`;
     }
 
@@ -846,23 +861,14 @@
 
       const drafts = getAllDrafts();
       const names = Object.keys(drafts);
-
       draftList.innerHTML = `<option value="">下書きを選択</option>`;
 
       names
-        .sort((a, b) => {
-          const timeA = drafts[a].savedAt || "";
-          const timeB = drafts[b].savedAt || "";
-          return timeB.localeCompare(timeA);
-        })
+        .sort((a, b) => (drafts[b].savedAt || "").localeCompare(drafts[a].savedAt || ""))
         .forEach((name) => {
           const option = document.createElement("option");
           option.value = name;
-
-          const savedAt = drafts[name].savedAt
-            ? new Date(drafts[name].savedAt).toLocaleString("ja-JP")
-            : "";
-
+          const savedAt = drafts[name].savedAt ? new Date(drafts[name].savedAt).toLocaleString("ja-JP") : "";
           option.textContent = savedAt ? `${name}（${savedAt}）` : name;
           if (name === selectedName) option.selected = true;
           draftList.appendChild(option);
@@ -882,7 +888,6 @@
       saveAllDrafts(drafts);
       document.getElementById("draftName").value = name;
       refreshDraftList(name);
-
       if (showMessage) showToast("下書きを保存しました");
     }
 
@@ -962,7 +967,6 @@
 
     function saveCompletedOrder() {
       purgeExpiredCompletedOrders();
-
       const orders = getAllCompletedOrders();
       const data = getFormData();
       const id = `order_${Date.now()}`;
@@ -975,7 +979,7 @@
       };
 
       saveAllCompletedOrders(orders);
-      refreshCompletedOrderList(id);
+      refreshCompletedOrderList();
     }
 
     function refreshCompletedOrderList() {
@@ -1002,12 +1006,9 @@
       const container = document.getElementById("completedOrderCards");
       if (!container) return;
 
+      purgeExpiredCompletedOrders();
       const orders = getAllCompletedOrders();
-      const ids = Object.keys(orders).sort((a, b) => {
-        const timeA = orders[a].createdAt || "";
-        const timeB = orders[b].createdAt || "";
-        return timeB.localeCompare(timeA);
-      });
+      const ids = Object.keys(orders).sort((a, b) => (orders[b].createdAt || "").localeCompare(orders[a].createdAt || ""));
 
       if (ids.length === 0) {
         container.innerHTML = `<div class="empty-list">作成済み発注書はありません。</div>`;
@@ -1018,22 +1019,24 @@
 
       ids.forEach((id) => {
         const order = orders[id];
-        const createdAt = order.createdAt
-          ? new Date(order.createdAt).toLocaleString("ja-JP")
-          : "";
-
+        const createdAt = order.createdAt ? new Date(order.createdAt).toLocaleString("ja-JP") : "";
         const card = document.createElement("div");
         card.className = "completed-order-card";
         card.innerHTML = `
-          <div class="completed-order-title">${esc(order.title || "発注書")}</div>
-          <div class="completed-order-meta">
-            作成日時：${esc(createdAt)}<br>
-            取引先：${esc(order.supplierName || "未入力")}<br>
-            品名：${esc(order.itemName || "未入力")}
-          </div>
-          <div class="btn-row" style="margin-top: 8px;">
-            <button class="btn-primary" type="button" onclick="loadCompletedOrderById('${id}')">表示</button>
-            <button class="btn-danger" type="button" onclick="deleteCompletedOrderById('${id}')">削除</button>
+          <div class="completed-order-check">
+            <input type="checkbox" class="completed-order-checkbox" value="${esc(id)}" aria-label="発注書を選択">
+            <div class="completed-order-body">
+              <div class="completed-order-title">${esc(order.title || "発注書")}</div>
+              <div class="completed-order-meta">
+                作成日時：${esc(createdAt)}<br>
+                取引先：${esc(order.supplierName || "未入力")}<br>
+                品名：${esc(order.itemName || "未入力")}
+              </div>
+              <div class="btn-row" style="margin-top: 8px;">
+                <button class="btn-primary" type="button" onclick="loadCompletedOrderById('${id}')">表示</button>
+                <button class="btn-danger" type="button" onclick="deleteCompletedOrderById('${id}')">削除</button>
+              </div>
+            </div>
           </div>
         `;
         container.appendChild(card);
@@ -1068,47 +1071,15 @@
       showToast("作成済み発注書を削除しました");
     }
 
-    function loadSelectedCompletedOrder() {
-      const list = document.getElementById("completedOrderList");
-      const id = list.value;
-
-      if (!id) {
-        showToast("表示する発注書を選択してください");
-        return;
-      }
-
-      const orders = getAllCompletedOrders();
-      const data = orders[id];
-
-      if (!data) {
-        showToast("発注書が見つかりません");
-        refreshCompletedOrderList();
-        return;
-      }
-
-      setFormData(data);
-      generateSheet({ saveHistory: false });
-      showToast("作成済み発注書を表示しました");
+    function selectAllCompletedOrders(checked) {
+      document.querySelectorAll(".completed-order-checkbox").forEach((checkbox) => {
+        checkbox.checked = checked;
+      });
     }
 
-    function deleteSelectedCompletedOrder() {
-      const list = document.getElementById("completedOrderList");
-      const id = list.value;
-
-      if (!id) {
-        showToast("削除する発注書を選択してください");
-        return;
-      }
-
-      const orders = getAllCompletedOrders();
-      const title = orders[id]?.title || id;
-      const ok = confirm(`「${title}」を削除しますか？`);
-      if (!ok) return;
-
-      delete orders[id];
-      saveAllCompletedOrders(orders);
-      refreshCompletedOrderList();
-      showToast("作成済み発注書を削除しました");
+    function getSelectedCompletedOrderIds() {
+      return Array.from(document.querySelectorAll(".completed-order-checkbox:checked"))
+        .map((checkbox) => checkbox.value);
     }
 
     function refreshDraftImagePreview() {
@@ -1152,18 +1123,7 @@
       }
 
       const delivery = [deliveryMonth, deliveryTerm].filter(Boolean).join(" ");
-
-      let totalQty = 0;
-      let grandTotal = 0;
-      lineItems.forEach((item) => {
-        totalQty += item.qty;
-        grandTotal += item.qty * item.price;
-      });
-
-      const avgPrice = totalQty > 0 ? grandTotal / totalQty : 0;
-      const hasDifferentPrice = lineItems.some(item => item.qty > 0 && item.price > 0 && basePrice > 0 && item.price !== basePrice);
-      const costPrice = hasDifferentPrice && avgPrice > 0 ? avgPrice : basePrice;
-      const rate = costPrice > 0 && itemRetail > 0 ? ((costPrice / itemRetail) * 100).toFixed(1) + "%" : "";
+      const summary = calculateOrderSummary({ basePrice, itemRetail, lineItems });
 
       document.getElementById("outCompanyName").textContent = companyName;
       document.getElementById("outSupplierName").textContent = supplierName;
@@ -1175,8 +1135,8 @@
       document.getElementById("outItemName").textContent = itemName;
       document.getElementById("outBasePrice").textContent = formatNumber(basePrice);
       document.getElementById("outItemRetail").textContent = formatNumber(itemRetail);
-      document.getElementById("outRate").textContent = rate;
-      document.getElementById("outAvgPrice").textContent = costPrice > 0 ? costPrice.toFixed(1) : "";
+      document.getElementById("outRate").textContent = summary.itemRate;
+      document.getElementById("outAvgPrice").textContent = summary.costPrice > 0 ? summary.costPrice.toFixed(1) : "";
       document.getElementById("outRemarks").textContent = remarks;
 
       const tbody = document.getElementById("outLineItems");
@@ -1196,22 +1156,174 @@
         tbody.appendChild(tr);
       });
 
-      document.getElementById("outTotalQty").textContent = formatNumber(totalQty);
-      document.getElementById("outGrandTotal").textContent = formatNumber(grandTotal);
+      document.getElementById("outTotalQty").textContent = formatNumber(summary.totalQty);
+      document.getElementById("outGrandTotal").textContent = formatNumber(summary.grandTotal);
 
       refreshDraftImagePreview();
-      if (shouldSaveHistory) {
-        saveCompletedOrder();
-      }
+      if (shouldSaveHistory) saveCompletedOrder();
       document.getElementById("formArea").style.display = "none";
+      document.getElementById("completedListArea").style.display = "none";
       document.getElementById("printArea").style.display = "block";
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
+    function calculateOrderSummary({ basePrice, itemRetail, lineItems }) {
+      let totalQty = 0;
+      let grandTotal = 0;
+      let hasDifferentPrice = false;
+
+      lineItems.forEach((item) => {
+        const qty = Number(item.qty || 0);
+        const price = Number(item.price || 0);
+        totalQty += qty;
+        grandTotal += qty * price;
+        if (qty > 0 && price > 0 && basePrice > 0 && price !== basePrice) {
+          hasDifferentPrice = true;
+        }
+      });
+
+      const avgPrice = totalQty > 0 ? grandTotal / totalQty : 0;
+      const costPrice = hasDifferentPrice && avgPrice > 0 ? avgPrice : basePrice;
+      const itemRate = costPrice > 0 && itemRetail > 0 ? ((costPrice / itemRetail) * 100).toFixed(1) + "%" : "";
+      return { totalQty, grandTotal, avgPrice, costPrice, itemRate };
+    }
+
     function backToEdit() {
       document.getElementById("formArea").style.display = "block";
+      document.getElementById("completedListArea").style.display = "none";
       document.getElementById("printArea").style.display = "none";
       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function getOrderCsvRows(order) {
+      const companyName = "株式会社アンティローザ";
+      const supplierName = order.supplierName || "";
+      const orderDate = order.orderDate || "";
+      const delivery = [order.deliveryMonth, order.deliveryTerm].filter(Boolean).join(" ");
+      const staffName = order.staffName || "";
+      const shipTo = order.shipTo || "";
+      const supplierCode = order.supplierCode || "";
+      const itemName = order.itemName || "";
+      const basePrice = Number(order.basePrice || 0);
+      const itemRetail = Number(order.itemRetail || 0);
+      const remarks = order.remarks || "";
+      const lineItems = order.lineItems || [];
+      const summary = calculateOrderSummary({ basePrice, itemRetail, lineItems });
+
+      return lineItems.map((item) => {
+        const qty = Number(item.qty || 0);
+        const price = Number(item.price || 0);
+        const amount = qty * price;
+        return [
+          orderDate,
+          companyName,
+          supplierName,
+          staffName,
+          delivery,
+          shipTo,
+          supplierCode,
+          itemName,
+          basePrice,
+          summary.costPrice > 0 ? summary.costPrice.toFixed(1) : "",
+          itemRetail,
+          summary.itemRate,
+          item.color || "",
+          item.size || "",
+          item.memo || "",
+          qty,
+          price,
+          amount,
+          remarks,
+          order.createdAt || ""
+        ];
+      });
+    }
+
+    function downloadRowsAsCSV(rows, filename) {
+      const headers = [
+        "発注日",
+        "自社名",
+        "取引先名",
+        "担当者",
+        "納期",
+        "納品先",
+        "仕入れ先品番",
+        "品名",
+        "基準単価",
+        "平均単価",
+        "上代",
+        "原価率",
+        "カラー",
+        "サイズ",
+        "メモ",
+        "数量",
+        "明細単価",
+        "金額",
+        "備考",
+        "発注書作成日時"
+      ];
+
+      const csv = [headers, ...rows]
+        .map(row => row.map(csvEscape).join(","))
+        .join("
+");
+
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadCSV() {
+      const data = getFormData();
+      const rows = getOrderCsvRows({ ...data, createdAt: new Date().toISOString() });
+
+      if (!data.itemName) {
+        alert("商品名を入力してください。");
+        return;
+      }
+
+      if (rows.length === 0) {
+        alert("明細を1行以上入力してください。");
+        return;
+      }
+
+      const safeDate = data.orderDate || "date";
+      const safeSupplier = data.supplierName || "supplier";
+      const safeItem = data.itemName || "item";
+      downloadRowsAsCSV(rows, `発注書_${safeDate}_${safeSupplier}_${safeItem}.csv`);
+    }
+
+    function downloadSelectedCompletedOrdersCSV() {
+      const selectedIds = getSelectedCompletedOrderIds();
+
+      if (selectedIds.length === 0) {
+        showToast("CSV出力する発注書を選択してください");
+        return;
+      }
+
+      const orders = getAllCompletedOrders();
+      const rows = [];
+
+      selectedIds.forEach((id) => {
+        if (orders[id]) rows.push(...getOrderCsvRows(orders[id]));
+      });
+
+      if (rows.length === 0) {
+        showToast("CSV出力できる明細がありません");
+        return;
+      }
+
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(today.getDate()).padStart(2, "0");
+      downloadRowsAsCSV(rows, `作成済み発注書まとめ_${yyyy}-${mm}-${dd}.csv`);
     }
 
     document.getElementById("basePrice").addEventListener("input", () => {
@@ -1229,7 +1341,6 @@
         uploadedImageData = "";
         return;
       }
-
       const reader = new FileReader();
       reader.onload = function (e) {
         uploadedImageData = e.target.result;
